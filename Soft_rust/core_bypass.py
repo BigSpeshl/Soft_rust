@@ -6,5 +6,7 @@ class ExternalCoreEngine:
 
     def update_state(self):
         if self.vars["flyhack"].get():
-            speed_multiplier = self.vars["flyhack_speed"].get()
-            time.sleep(0.005 * speed_multiplier)
+            speed = self.vars["flyhack_speed"].get()
+            time.sleep(0.005 * speed)
+        else:
+            time.sleep(0.05)

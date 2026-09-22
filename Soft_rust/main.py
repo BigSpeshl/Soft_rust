@@ -13,7 +13,6 @@ for module_name, package_name in required_packages.items():
     try:
         __import__(module_name)
     except ImportError:
-        print(f"[!] Библиотека '{package_name}' не найдена. Устанавливаем автоматически...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
 
 import tkinter as tk
@@ -25,6 +24,7 @@ try:
     from ai_vision import AIVisionAnalyzer
     from core_bypass import ExternalCoreEngine
     from cleaner import SystemCleaner
+    from overlay import GameOverlay
 except ImportError:
     pass
 
@@ -32,26 +32,24 @@ except ImportError:
 class RustExternalAIApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Rust External AI Assistant v5.0 [God Mode + Stealth Cleaner]")
-        self.root.geometry("820x600")
-        self.root.configure(bg="#1a1c23")
+        self.root.title("Rust External AI v5.2 [Cyberpunk UI & Active Overlay]")
+        self.root.geometry("860x620")
+        self.root.configure(bg="#0f111a")
         self.root.resizable(False, False)
 
         self.vars = {
             "rage_active": tk.BooleanVar(value=True),
-            "rage_key": tk.StringVar(value="LEFT MOUSE"),
+            "rage_key": tk.StringVar(value="[ LEFT MOUSE ]"),
             "auto_shoot": tk.BooleanVar(value=False),
             "draw_silent_fov": tk.BooleanVar(value=True),
-            "silent_fov_size": tk.IntVar(value=112),
+            "silent_fov_size": tk.IntVar(value=120),
             "ignore_players": tk.BooleanVar(value=False),
-            "ignore_sleepers": tk.BooleanVar(value=False),
+            "ignore_sleepers": tk.BooleanVar(value=True),
             "ignore_wounded": tk.BooleanVar(value=False),
             "ignore_npcs": tk.BooleanVar(value=False),
-            "ignore_teammates": tk.BooleanVar(value=False),
-            "fake_lag": tk.BooleanVar(value=False),
-            "anti_aim": tk.BooleanVar(value=False),
+            "ignore_teammates": tk.BooleanVar(value=True),
 
-            "flyhack": tk.BooleanVar(value=True),
+            "flyhack": tk.BooleanVar(value=False),
             "flyhack_speed": tk.IntVar(value=5),
             "wallhack_esp": tk.BooleanVar(value=True),
             "esp_boxes": tk.BooleanVar(value=True),
@@ -66,73 +64,86 @@ class RustExternalAIApp:
         self.core_engine = ExternalCoreEngine(self.vars)
         self.stealth_cleaner = SystemCleaner()
 
+        # Создаем элементы интерфейса
         self.create_widgets()
 
+        # Запускаем Overlay в отдельном потоке для корректной отрисовки FOV поверх игры
+        self.overlay_thread = threading.Thread(target=self.start_overlay, daemon=True)
+        self.overlay_thread.start()
+
+        # Запуск главного рабочего потока функций
         self.main_thread = threading.Thread(target=self.processing_loop, daemon=True)
         self.main_thread.start()
 
+    def start_overlay(self):
+        try:
+            self.overlay = GameOverlay(self.vars)
+            self.overlay.root.mainloop()
+        except Exception as e:
+            print(f"Overlay error: {e}")
+
     def create_widgets(self):
-        sidebar = tk.Frame(self.root, bg="#111318", width=70, height=600)
+        # Боковая панель в стиле киберпанк
+        sidebar = tk.Frame(self.root, bg="#0b0d14", width=75, height=620)
         sidebar.pack(side=tk.LEFT, fill=tk.Y)
 
-        icons = ["🎯", "👁️", "✈️", "⚙️", "💾"]
+        icons = ["🎯", "👁️", "✈️", "🛡️", "💾"]
         for i, icon in enumerate(icons):
-            # Привязываем последнюю кнопку (💾) к панели очистки/конфигов
-            btn = tk.Button(sidebar, text=icon, font=("Arial", 16), bg="#111318", fg="#ffffff",
-                            activebackground="#252833", activeforeground="#ffffff", bd=0, relief=tk.FLAT,
+            btn = tk.Button(sidebar, text=icon, font=("Segoe UI Emoji", 16), bg="#0b0d14", fg="#8f93a2",
+                            activebackground="#1a1d2e", activeforeground="#00ffcc", bd=0, relief=tk.FLAT,
                             command=lambda idx=i: self.switch_tab(idx))
-            btn.place(x=10, y=20 + (i * 70), width=50, height=50)
+            btn.place(x=12, y=25 + (i * 75), width=50, height=50)
 
-        self.main_frame = tk.Frame(self.root, bg="#1a1c23")
-        self.main_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+        self.main_frame = tk.Frame(self.root, bg="#0f111a")
+        self.main_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=12, pady=12)
 
-        # Создаем панели для переключения
-        self.panel_combat = tk.LabelFrame(self.main_frame, text="", bg="#21242d", fg="#ffffff", bd=1, relief=tk.SOLID)
-        self.panel_config = tk.LabelFrame(self.main_frame, text="", bg="#21242d", fg="#ffffff", bd=1, relief=tk.SOLID)
+        self.panel_combat = tk.Frame(self.main_frame, bg="#0f111a")
+        self.panel_config = tk.Frame(self.main_frame, bg="#0f111a")
 
         self.build_combat_panels(self.panel_combat)
         self.build_config_panel(self.panel_config)
 
-        # По умолчанию отображаем боевую панель
-        self.panel_combat.place(x=0, y=0, width=780, height=575)
+        self.panel_combat.place(x=0, y=0, width=760, height=595)
 
     def switch_tab(self, tab_index):
-        """Переключение между вкладками интерфейса"""
         self.panel_combat.place_forget()
         self.panel_config.place_forget()
 
-        if tab_index == 4:  # Вкладка Configs / Cleaner (💾)
-            self.panel_config.place(x=0, y=0, width=780, height=575)
+        if tab_index == 4:
+            self.panel_config.place(x=0, y=0, width=760, height=595)
         else:
-            self.panel_combat.place(x=0, y=0, width=780, height=575)
+            self.panel_combat.place(x=0, y=0, width=760, height=595)
 
     def build_combat_panels(self, parent):
-        col1 = tk.LabelFrame(parent, text="", bg="#21242d", fg="#ffffff", bd=1, relief=tk.SOLID)
-        col1.place(x=10, y=10, width=370, height=550)
+        col1 = tk.LabelFrame(parent, text=" 🎯 COMBAT / AIMBOT ", bg="#141722", fg="#00ffcc",
+                             font=("Segoe UI", 9, "bold"), bd=1, relief=tk.SOLID)
+        col1.place(x=0, y=0, width=365, height=585)
         self.build_rage_panel(col1)
 
-        col2 = tk.LabelFrame(parent, text="", bg="#21242d", fg="#ffffff", bd=1, relief=tk.SOLID)
-        col2.place(x=390, y=10, width=370, height=550)
+        col2 = tk.LabelFrame(parent, text=" 👁️ VISUALS & CORE ", bg="#141722", fg="#ff007f",
+                             font=("Segoe UI", 9, "bold"), bd=1, relief=tk.SOLID)
+        col2.place(x=380, y=0, width=365, height=585)
         self.build_visuals_panel(col2)
 
     def build_rage_panel(self, parent):
-        tk.Checkbutton(parent, text="Rage Aimbot", variable=self.vars["rage_active"],
-                       bg="#21242d", fg="#ffffff", selectcolor="#1a1c23", activebackground="#21242d",
-                       activeforeground="#ffffff").place(x=15, y=15)
-        tk.Button(parent, textvariable=self.vars["rage_key"], bg="#2e3240", fg="#ffffff", bd=0,
-                  font=("Arial", 9)).place(x=250, y=15, width=100, height=25)
+        self.cyber_check(parent, "Rage Aimbot Active", self.vars["rage_active"], 20, 25)
 
-        tk.Checkbutton(parent, text="Automatic Shoot", variable=self.vars["auto_shoot"],
-                       bg="#21242d", fg="#888c99", selectcolor="#1a1c23", activebackground="#21242d",
-                       activeforeground="#ffffff").place(x=15, y=45)
-        tk.Checkbutton(parent, text="Draw Silent FOV", variable=self.vars["draw_silent_fov"],
-                       bg="#21242d", fg="#ffffff", selectcolor="#1a1c23", activebackground="#21242d",
-                       activeforeground="#ffffff").place(x=15, y=75)
+        key_btn = tk.Button(parent, textvariable=self.vars["rage_key"], bg="#1e2230", fg="#00ffcc",
+                            font=("Segoe UI", 8, "bold"), bd=0, relief=tk.FLAT)
+        key_btn.place(x=230, y=23, width=110, height=26)
 
-        scale_fov = tk.Scale(parent, from_=10, to=300, orient=tk.HORIZONTAL, variable=self.vars["silent_fov_size"],
-                             bg="#21242d", fg="#ffffff", highlightthickness=0, troughcolor="#2e3240", bd=0)
-        scale_fov.place(x=15, y=105, width=335, height=30)
-        tk.Label(parent, text="Silent FOV", bg="#21242d", fg="#888c99", font=("Arial", 8)).place(x=280, y=138)
+        self.cyber_check(parent, "Automatic Shoot", self.vars["auto_shoot"], 20, 65)
+        self.cyber_check(parent, "Draw Silent FOV (Overlay)", self.vars["draw_silent_fov"], 20, 105)
+
+        tk.Label(parent, text="Silent FOV Radius", bg="#141722", fg="#8f93a2", font=("Segoe UI", 8)).place(x=22, y=145)
+        scale_fov = tk.Scale(parent, from_=20, to=300, orient=tk.HORIZONTAL, variable=self.vars["silent_fov_size"],
+                             bg="#141722", fg="#00ffcc", highlightthickness=0, troughcolor="#1e2230", bd=0,
+                             sliderrelief=tk.FLAT)
+        scale_fov.place(x=20, y=165, width=320, height=30)
+
+        tk.Frame(parent, bg="#232738", height=1).place(x=20, y=220, width=320)
+        tk.Label(parent, text="TARGET FILTERS", bg="#141722", fg="#565b70", font=("Segoe UI", 8, "bold")).place(x=20,
+                                                                                                                y=235)
 
         filters = [
             ("Ignore Players", "ignore_players"),
@@ -142,17 +153,10 @@ class RustExternalAIApp:
             ("Ignore Teammates", "ignore_teammates")
         ]
         for idx, (text, var_name) in enumerate(filters):
-            tk.Checkbutton(parent, text=text, variable=self.vars[var_name],
-                           bg="#21242d", fg="#ffffff", selectcolor="#1a1c23", activebackground="#21242d",
-                           activeforeground="#ffffff").place(x=15, y=180 + (idx * 28))
+            self.cyber_check(parent, text, self.vars[var_name], 20, 265 + (idx * 35), fg="#cfd3e2")
 
     def build_visuals_panel(self, parent):
-        tk.Label(parent, text="MODULAR AI VISION & FLYHACK", bg="#21242d", fg="#00ffcc",
-                 font=("Arial", 9, "bold")).place(x=15, y=15)
-
-        tk.Checkbutton(parent, text="Wallhack ESP (Анализ сквозь стены)", variable=self.vars["wallhack_esp"],
-                       bg="#21242d", fg="#ffffff", selectcolor="#1a1c23", activebackground="#21242d",
-                       activeforeground="#ffffff", font=("Arial", 9, "bold")).place(x=15, y=45)
+        self.cyber_check(parent, "Wallhack ESP (Анализ)", self.vars["wallhack_esp"], 20, 25, fg="#ff007f")
 
         esp_options = [
             ("Draw 3D / 2D Boxes", "esp_boxes"),
@@ -161,68 +165,72 @@ class RustExternalAIApp:
             ("Show Distance & HP", "esp_distance")
         ]
         for idx, (text, var_name) in enumerate(esp_options):
-            tk.Checkbutton(parent, text=text, variable=self.vars[var_name],
-                           bg="#21242d", fg="#cccccc", selectcolor="#1a1c23", activebackground="#21242d",
-                           activeforeground="#ffffff").place(x=35, y=75 + (idx * 28))
+            self.cyber_check(parent, text, self.vars[var_name], 40, 65 + (idx * 32))
 
-        tk.Frame(parent, bg="#2e3240", height=2).place(x=15, y=195, width=335)
+        tk.Frame(parent, bg="#232738", height=1).place(x=20, y=210, width=320)
 
-        tk.Checkbutton(parent, text="FlyHack Engine", variable=self.vars["flyhack"],
-                       bg="#21242d", fg="#00ffcc", selectcolor="#1a1c23", activebackground="#21242d",
-                       activeforeground="#ffffff", font=("Arial", 9, "bold")).place(x=15, y=210)
+        self.cyber_check(parent, "FlyHack Engine", self.vars["flyhack"], 20, 225, fg="#00ffcc")
 
+        tk.Label(parent, text="FlyHack Speed Multiplier", bg="#141722", fg="#8f93a2", font=("Segoe UI", 8)).place(x=22,
+                                                                                                                  y=265)
         scale_fly = tk.Scale(parent, from_=1, to=20, orient=tk.HORIZONTAL, variable=self.vars["flyhack_speed"],
-                             bg="#21242d", fg="#ffffff", highlightthickness=0, troughcolor="#2e3240", bd=0)
-        scale_fly.place(x=15, y=245, width=335, height=30)
-        tk.Label(parent, text="FlyHack Speed Multiplier", bg="#21242d", fg="#888c99", font=("Arial", 8)).place(x=215,
-                                                                                                               y=278)
+                             bg="#141722", fg="#00ffcc", highlightthickness=0, troughcolor="#1e2230", bd=0,
+                             sliderrelief=tk.FLAT)
+        scale_fly.place(x=20, y=285, width=320, height=30)
 
-        info_box = tk.Label(parent, text="[STATUS]: Connected to modules.\nStealth Cleaner module ready.",
-                            bg="#16181f", fg="#00ff00", font=("Consolas", 8), justify=tk.LEFT, padx=10, pady=5)
-        info_box.place(x=15, y=320, width=335, height=45)
+        status_frame = tk.Frame(parent, bg="#0b0d14", bd=1, relief=tk.SOLID)
+        status_frame.place(x=20, y=340, width=325, height=65)
+        tk.Label(status_frame, text="[STATUS]: Overlay Active & Modules Online.\n[STEALTH]: Cleaner Ready.",
+                 bg="#0b0d14", fg="#00ff99", font=("Consolas", 8), justify=tk.LEFT).place(x=10, y=12)
 
     def build_config_panel(self, parent):
-        """Пятая вкладка: Управление конфигами и скрытная очистка следов"""
-        tk.Label(parent, text="CONFIGURATION & STEALTH CLEANER", bg="#21242d", fg="#ff5555",
-                 font=("Arial", 11, "bold")).place(x=20, y=20)
+        panel = tk.LabelFrame(parent, text=" 💾 PRESETS & STEALTH TRACE CLEANER ", bg="#141722", fg="#ffcc00",
+                              font=("Segoe UI", 9, "bold"), bd=1, relief=tk.SOLID)
+        panel.place(x=0, y=0, width=745, height=585)
 
-        tk.Label(parent, text="Управление пресетами чит-конфигураций:", bg="#21242d", fg="#ffffff",
-                 font=("Arial", 9)).place(x=20, y=60)
+        tk.Label(panel, text="Управление конфигурацией:", bg="#141722", fg="#ffffff",
+                 font=("Segoe UI", 9, "bold")).place(x=30, y=40)
 
-        btn_save = tk.Button(parent, text="Сохранить конфиг", bg="#2e3240", fg="#ffffff", bd=0, font=("Arial", 9),
+        btn_save = tk.Button(panel, text="Сохранить конфиг", bg="#1e2230", fg="#00ffcc", bd=0, font=("Segoe UI", 9),
                              command=self.save_config)
-        btn_save.place(x=20, y=95, width=160, height=30)
+        btn_save.place(x=30, y=75, width=180, height=35)
 
-        btn_load = tk.Button(parent, text="Загрузить конфиг", bg="#2e3240", fg="#ffffff", bd=0, font=("Arial", 9),
+        btn_load = tk.Button(panel, text="Загрузить конфиг", bg="#1e2230", fg="#00ffcc", bd=0, font=("Segoe UI", 9),
                              command=self.load_config)
-        btn_load.place(x=195, y=95, width=160, height=30)
+        btn_load.place(x=230, y=75, width=180, height=35)
 
-        tk.Frame(parent, bg="#2e3240", height=2).place(x=20, y=150, width=730)
+        tk.Frame(panel, bg="#232738", height=1).place(x=30, y=140, width=685)
 
-        tk.Label(parent, text="Анти-хит / Проверка администратора:", bg="#21242d", fg="#ffcc00",
-                 font=("Arial", 10, "bold")).place(x=20, y=175)
-        tk.Label(parent,
-                 text="Полная и незаметная очистка следов (удаляются только файлы чите, Temp, Recent и ветки реестра).",
-                 bg="#21242d", fg="#888c99", font=("Arial", 8)).place(x=20, y=200)
+        tk.Label(panel, text="АНТИ-ПРОВЕРКА / ПОЛНАЯ ОЧИСТКА СЛЕДОВ", bg="#141722", fg="#ff4444",
+                 font=("Segoe UI", 10, "bold")).place(x=30, y=170)
+        tk.Label(panel,
+                 text="Инструмент мгновенно удаляет все следы работы чита из папок Temp, Recent и веток реестра,\nпри этом файлы сторонних программ и операционной системы не затрагиваются.",
+                 bg="#141722", fg="#8f93a2", font=("Segoe UI", 8), justify=tk.LEFT).place(x=30, y=200)
 
-        # Главная кнопка полной очистки следов
-        btn_clean = tk.Button(parent, text="🗑 СТЕРЕТЬ ВСЕ СЛЕДЫ ЧИТА (TEMP, RECENT, REGISTRY)", bg="#8b0000",
-                              fg="#ffffff", bd=0, font=("Arial", 10, "bold"), command=self.trigger_stealth_clean)
-        btn_clean.place(x=20, y=235, width=420, height=45)
+        btn_clean = tk.Button(panel, text="🗑 СТЕРЕТЬ ВСЕ СЛЕДЫ ЧИТА (TEMP, RECENT, REGISTRY)", bg="#7a1c1c",
+                              fg="#ffffff", activebackground="#a82525", activeforeground="#ffffff", bd=0,
+                              font=("Segoe UI", 10, "bold"), command=self.trigger_stealth_clean)
+        btn_clean.place(x=30, y=250, width=480, height=50)
+
+    def cyber_check(self, parent, text, var, x, y, fg="#ffffff"):
+        chk = tk.Checkbutton(parent, text=text, variable=var,
+                             bg="#141722", fg=fg, selectcolor="#0f111a",
+                             activebackground="#141722", activeforeground=fg,
+                             font=("Segoe UI", 9), bd=0)
+        chk.place(x=x, y=y)
 
     def save_config(self):
-        messagebox.showinfo("Configs", "Конфигурация успешно сохранена в Soft_rust/config.json")
+        messagebox.showinfo("Configs", "Конфигурация успешно сохранена.")
 
     def load_config(self):
         messagebox.showinfo("Configs", "Конфигурация успешно загружена.")
 
     def trigger_stealth_clean(self):
-        """Вызов модуля тотальной очистки следов"""
         success = self.stealth_cleaner.wipe_all_traces()
         if success:
-            messagebox.showinfo("Stealth Mode", "Все следы в Temp, Recent и Registry успешно стерты! Система чиста.")
+            messagebox.showinfo("Stealth Mode", "Полная очистка следов успешно завершена! Система кристально чиста.")
         else:
-            messagebox.showerror("Error", "Ошибка при выполнении очистки.")
+            messagebox.showerror("Error", "Произошла ошибка при очистке следов.")
 
     def processing_loop(self):
         while self.is_running:
@@ -232,6 +240,10 @@ class RustExternalAIApp:
 
     def onunload(self):
         self.is_running = False
+        try:
+            self.overlay.close()
+        except:
+            pass
         self.root.destroy()
 
 
