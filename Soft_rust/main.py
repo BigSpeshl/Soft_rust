@@ -32,7 +32,7 @@ except ImportError:
 class RustExternalAIApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Rust External AI v5.2 [Cyberpunk UI & Active Overlay]")
+        self.root.title("Rust External AI v5.3 [Fixed Tabs & Active Modules]")
         self.root.geometry("860x620")
         self.root.configure(bg="#0f111a")
         self.root.resizable(False, False)
@@ -40,9 +40,9 @@ class RustExternalAIApp:
         self.vars = {
             "rage_active": tk.BooleanVar(value=True),
             "rage_key": tk.StringVar(value="[ LEFT MOUSE ]"),
-            "auto_shoot": tk.BooleanVar(value=False),
+            "auto_shoot": tk.BooleanVar(value=True),
             "draw_silent_fov": tk.BooleanVar(value=True),
-            "silent_fov_size": tk.IntVar(value=120),
+            "silent_fov_size": tk.IntVar(value=110),
             "ignore_players": tk.BooleanVar(value=False),
             "ignore_sleepers": tk.BooleanVar(value=True),
             "ignore_wounded": tk.BooleanVar(value=False),
@@ -64,14 +64,13 @@ class RustExternalAIApp:
         self.core_engine = ExternalCoreEngine(self.vars)
         self.stealth_cleaner = SystemCleaner()
 
-        # Создаем элементы интерфейса
         self.create_widgets()
 
-        # Запускаем Overlay в отдельном потоке для корректной отрисовки FOV поверх игры
+        # Запуск Overlay
         self.overlay_thread = threading.Thread(target=self.start_overlay, daemon=True)
         self.overlay_thread.start()
 
-        # Запуск главного рабочего потока функций
+        # Запуск рабочего цикла
         self.main_thread = threading.Thread(target=self.processing_loop, daemon=True)
         self.main_thread.start()
 
@@ -83,7 +82,6 @@ class RustExternalAIApp:
             print(f"Overlay error: {e}")
 
     def create_widgets(self):
-        # Боковая панель в стиле киберпанк
         sidebar = tk.Frame(self.root, bg="#0b0d14", width=75, height=620)
         sidebar.pack(side=tk.LEFT, fill=tk.Y)
 
@@ -94,27 +92,33 @@ class RustExternalAIApp:
                             command=lambda idx=i: self.switch_tab(idx))
             btn.place(x=12, y=25 + (i * 75), width=50, height=50)
 
-        self.main_frame = tk.Frame(self.root, bg="#0f111a")
-        self.main_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=12, pady=12)
+        self.container = tk.Frame(self.root, bg="#0f111a")
+        self.container.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=12, pady=12)
 
-        self.panel_combat = tk.Frame(self.main_frame, bg="#0f111a")
-        self.panel_config = tk.Frame(self.main_frame, bg="#0f111a")
+        # Создаем вкладки
+        self.tab_combat = tk.Frame(self.container, bg="#0f111a")
+        self.tab_config = tk.Frame(self.container, bg="#0f111a")
 
-        self.build_combat_panels(self.panel_combat)
-        self.build_config_panel(self.panel_config)
+        self.build_combat_tab(self.tab_combat)
+        self.build_config_tab(self.tab_config)
 
-        self.panel_combat.place(x=0, y=0, width=760, height=595)
+        # По умолчанию активна боевая вкладка
+        self.show_tab(self.tab_combat)
 
     def switch_tab(self, tab_index):
-        self.panel_combat.place_forget()
-        self.panel_config.place_forget()
+        # Очищаем контейнер
+        self.tab_combat.pack_forget()
+        self.tab_config.pack_forget()
 
-        if tab_index == 4:
-            self.panel_config.place(x=0, y=0, width=760, height=595)
-        else:
-            self.panel_combat.place(x=0, y=0, width=760, height=595)
+        if tab_index == 4:  # Кнопка 💾 (Настройки и очистка)
+            self.show_tab(self.tab_config)
+        else:  # Остальные кнопки (🎯, 👁️, ✈️, 🛡️) ведут на панель управления функциями
+            self.show_tab(self.tab_combat)
 
-    def build_combat_panels(self, parent):
+    def show_tab(self, tab):
+        tab.pack(fill=tk.BOTH, expand=True)
+
+    def build_combat_tab(self, parent):
         col1 = tk.LabelFrame(parent, text=" 🎯 COMBAT / AIMBOT ", bg="#141722", fg="#00ffcc",
                              font=("Segoe UI", 9, "bold"), bd=1, relief=tk.SOLID)
         col1.place(x=0, y=0, width=365, height=585)
@@ -183,7 +187,7 @@ class RustExternalAIApp:
         tk.Label(status_frame, text="[STATUS]: Overlay Active & Modules Online.\n[STEALTH]: Cleaner Ready.",
                  bg="#0b0d14", fg="#00ff99", font=("Consolas", 8), justify=tk.LEFT).place(x=10, y=12)
 
-    def build_config_panel(self, parent):
+    def build_config_tab(self, parent):
         panel = tk.LabelFrame(parent, text=" 💾 PRESETS & STEALTH TRACE CLEANER ", bg="#141722", fg="#ffcc00",
                               font=("Segoe UI", 9, "bold"), bd=1, relief=tk.SOLID)
         panel.place(x=0, y=0, width=745, height=585)
@@ -234,8 +238,18 @@ class RustExternalAIApp:
 
     def processing_loop(self):
         while self.is_running:
-            self.vision_analyzer.process_frame()
-            self.core_engine.update_state()
+            # 1. Сканирование экрана через AI Vision
+            targets = self.vision_analyzer.scan_screen()
+
+            # 2. Передача данных на Overlay для отрисовки ESP
+            try:
+                self.overlay.update_esp_data(targets)
+            except:
+                pass
+
+            # 3. Обработка боевой логики (Aimbot & Auto-Shoot)
+            self.core_engine.process_combat(targets)
+
             time.sleep(0.01)
 
     def onunload(self):
