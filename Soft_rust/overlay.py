@@ -2,13 +2,15 @@ import tkinter as tk
 
 
 class GameOverlay:
-    def __init__(self, config_vars):
+    def __init__(self, config_vars, parent_root=None):
         self.vars = config_vars
-        self.root = tk.Tk()
+        self.root = tk.Toplevel(parent_root if parent_root else tk.Tk())
         self.root.overrideredirect(True)
         self.root.attributes("-topmost", True)
         self.root.attributes("-transparentcolor", "black")
 
+        # Обновляем окно, чтобы получить корректные размеры экрана
+        self.root.update_idletasks()
         self.screen_width = self.root.winfo_screenwidth()
         self.screen_height = self.root.winfo_screenheight()
         self.root.geometry(f"{self.screen_width}x{self.screen_height}+0+0")
@@ -18,6 +20,7 @@ class GameOverlay:
         self.canvas.pack(fill=tk.BOTH, expand=True)
 
         self.is_active = True
+        self.detected_targets = []
         self.render_loop()
 
     def render_loop(self):
@@ -41,7 +44,6 @@ class GameOverlay:
 
         # 2. Отрисовка активного ESP (Боксы, Скелеты, Дистанция поверх экрана)
         if self.vars["wallhack_esp"].get():
-            # Демонстрационная отрисовка активных целей в поле зрения (сканирование кадров)
             targets = getattr(self, "detected_targets", [])
             for target in targets:
                 x, y, w, h, dist = target['x'], target['y'], target['w'], target['h'], target['dist']

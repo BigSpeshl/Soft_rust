@@ -22,11 +22,23 @@ import time
 
 try:
     from ai_vision import AIVisionAnalyzer
+except ImportError:
+    AIVisionAnalyzer = None
+
+try:
     from core_bypass import ExternalCoreEngine
+except ImportError:
+    ExternalCoreEngine = None
+
+try:
     from cleaner import SystemCleaner
+except ImportError:
+    SystemCleaner = None
+
+try:
     from overlay import GameOverlay
 except ImportError:
-    pass
+    GameOverlay = None
 
 
 class RustExternalAIApp:
@@ -60,23 +72,26 @@ class RustExternalAIApp:
 
         self.is_running = True
 
-        self.vision_analyzer = AIVisionAnalyzer(self.vars)
-        self.core_engine = ExternalCoreEngine(self.vars)
-        self.stealth_cleaner = SystemCleaner()
+        self.vision_analyzer = AIVisionAnalyzer(self.vars) if AIVisionAnalyzer else None
+        self.core_engine = ExternalCoreEngine(self.vars) if ExternalCoreEngine else None
+        self.stealth_cleaner = SystemCleaner() if SystemCleaner else None
 
         self.create_widgets()
 
         # Запуск Overlay
-        self.overlay_thread = threading.Thread(target=self.start_overlay, daemon=True)
+        self.overlay_thread = threading.Thread(target=self.start_overlay, args=(root,), daemon=True)
         self.overlay_thread.start()
 
         # Запуск рабочего цикла
         self.main_thread = threading.Thread(target=self.processing_loop, daemon=True)
         self.main_thread.start()
 
-    def start_overlay(self):
+    def start_overlay(self, parent_root):
         try:
-            self.overlay = GameOverlay(self.vars)
+            if GameOverlay is None:
+                print("Overlay module not available")
+                return
+            self.overlay = GameOverlay(self.vars, parent_root)
             self.overlay.root.mainloop()
         except Exception as e:
             print(f"Overlay error: {e}")
@@ -98,6 +113,7 @@ class RustExternalAIApp:
         # Создаем вкладки
         self.tab_combat = tk.Frame(self.container, bg="#0f111a")
         self.tab_config = tk.Frame(self.container, bg="#0f111a")
+        self._tabs = [self.tab_combat, self.tab_config]
 
         self.build_combat_tab(self.tab_combat)
         self.build_config_tab(self.tab_config)
@@ -106,9 +122,9 @@ class RustExternalAIApp:
         self.show_tab(self.tab_combat)
 
     def switch_tab(self, tab_index):
-        # Очищаем контейнер
-        self.tab_combat.pack_forget()
-        self.tab_config.pack_forget()
+        # Скрываем все вкладки
+        for tab in getattr(self, '_tabs', []):
+            tab.pack_forget()
 
         if tab_index == 4:  # Кнопка 💾 (Настройки и очистка)
             self.show_tab(self.tab_config)
@@ -239,16 +255,26 @@ class RustExternalAIApp:
     def processing_loop(self):
         while self.is_running:
             # 1. Сканирование экрана через AI Vision
-            targets = self.vision_analyzer.scan_screen()
+            targets = []
+            if self.vision_analyzer:
+                try:
+                    targets = self.vision_analyzer.scan_screen()
+                except Exception:
+                    pass
 
             # 2. Передача данных на Overlay для отрисовки ESP
-            try:
-                self.overlay.update_esp_data(targets)
-            except:
-                pass
+            if hasattr(self, 'overlay') and self.overlay:
+                try:
+                    self.overlay.update_esp_data(targets)
+                except Exception:
+                    pass
 
             # 3. Обработка боевой логики (Aimbot & Auto-Shoot)
-            self.core_engine.process_combat(targets)
+            if self.core_engine:
+                try:
+                    self.core_engine.process_combat(targets)
+                except Exception:
+                    pass
 
             time.sleep(0.01)
 

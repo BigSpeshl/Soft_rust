@@ -1,5 +1,7 @@
 import os
-import winreg
+import sys
+import platform
+
 
 class SystemCleaner:
     def __init__(self):
@@ -9,31 +11,54 @@ class SystemCleaner:
         try:
             self.clean_temp_files()
             self.clean_recent_items()
-            self.clean_registry_traces()
+            if platform.system() == "Windows":
+                self.clean_registry_traces()
             return True
         except Exception:
             return False
 
     def clean_temp_files(self):
-        temp_dir = os.environ.get('TEMP', '')
-        if not temp_dir or not os.path.exists(temp_dir):
+        temp_dir = os.environ.get('TEMP') or os.environ.get('TMP') or '/tmp'
+        if not os.path.exists(temp_dir):
             return
         for root, dirs, files in os.walk(temp_dir, topdown=False):
             for file in files:
                 if any(sig.lower() in file.lower() for sig in self.signatures):
-                    try: os.remove(os.path.join(root, file))
-                    except: pass
+                    try:
+                        os.remove(os.path.join(root, file))
+                    except OSError:
+                        pass
 
     def clean_recent_items(self):
-        recent_dir = os.path.join(os.environ.get('APPDATA', ''), 'Microsoft', 'Windows', 'Recent')
+        system = platform.system()
+
+        if system == "Windows":
+            recent_dir = os.path.join(os.environ.get('APPDATA', ''), 'Microsoft', 'Windows', 'Recent')
+        elif system == "Darwin":  # macOS
+            home = os.environ.get('HOME', '')
+            recent_dir = os.path.join(home, 'Library', 'Application Support', 'Microsoft', 'Windows', 'Recent')
+            if not os.path.exists(recent_dir):
+                # Fallback: ~/Library/Recent
+                recent_dir = os.path.join(home, 'Library', 'Recent')
+        else:  # Linux and others
+            home = os.environ.get('HOME', '')
+            recent_dir = os.path.join(home, '.recent')
+
         if not os.path.exists(recent_dir):
             return
-        for shortcut in os.listdir(recent_dir):
-            if any(sig.lower() in shortcut.lower() for sig in self.signatures):
-                try: os.remove(os.path.join(recent_dir, shortcut))
-                except: pass
+        try:
+            for shortcut in os.listdir(recent_dir):
+                if any(sig.lower() in shortcut.lower() for sig in self.signatures):
+                    try:
+                        os.remove(os.path.join(recent_dir, shortcut))
+                    except OSError:
+                        pass
+        except OSError:
+            pass
 
     def clean_registry_traces(self):
+        import winreg
+
         reg_paths = [
             (winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Explorer\RecentDocs"),
             (winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run")
@@ -49,8 +74,8 @@ class SystemCleaner:
                             winreg.DeleteValue(key, name)
                         else:
                             i += 1
-                    except WindowsError:
+                    except OSError:
                         break
                 winreg.CloseKey(key)
-            except:
+            except OSError:
                 pass
