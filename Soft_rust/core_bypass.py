@@ -1,4 +1,3 @@
-import time
 import pyautogui
 
 pyautogui.FAILSAFE = False
@@ -7,36 +6,27 @@ pyautogui.FAILSAFE = False
 class ExternalCoreEngine:
     def __init__(self, config_vars):
         self.vars = config_vars
+        self.last_target = None
 
     def process_combat(self, targets):
-        # 1. Rage Aimbot Logic
-        if self.vars["rage_active"].get() and targets:
-            target = targets[0]  # Берем ближайшую цель
-            target_center_x = target['x'] + target['w'] // 2
-            target_center_y = target['y'] + target['h'] // 3  # Наводка на голову/корпус
+        """
+        Только информационная обработка. Не управляет мышью и не кликает.
+        Игрок сам управляет прицеливанием и стрельбой.
+        """
+        if not targets:
+            self.last_target = None
+            return
 
-            screen_cx = pyautogui.size().width // 2
-            screen_cy = pyautogui.size().height // 2
+        # Находим ближайшую цель (с минимальной дистанцией)
+        closest = None
+        min_dist = float('inf')
+        for target in targets:
+            dist = target.get('dist', 999)
+            if dist < min_dist:
+                min_dist = dist
+                closest = target
 
-            # Вычисление смещения
-            offset_x = (target_center_x - screen_cx) / 3.5  # Сглаживание аимбота
-            offset_y = (target_center_y - screen_cy) / 3.5
+        self.last_target = closest
 
-            try:
-                pyautogui.moveRel(offset_x, offset_y, duration=0.01)
-            except:
-                pass
-
-            # 2. Automatic Shoot Logic
-            if self.vars["auto_shoot"].get():
-                try:
-                    pyautogui.click()
-                except:
-                    pass
-
-        # 3. FlyHack Engine Logic
-        if self.vars["flyhack"].get():
-            speed = self.vars["flyhack_speed"].get()
-            time.sleep(0.002 * speed)
-        else:
-            time.sleep(0.01)
+        # Никогда не двигаем мышь и не кликаем автоматически.
+        # ESP уже показывает цели на оверлее - игрок сам прицеливается.

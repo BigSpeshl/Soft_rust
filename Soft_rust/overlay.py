@@ -1,4 +1,6 @@
 import tkinter as tk
+import threading
+from pynput import keyboard
 
 
 class GameOverlay:
@@ -21,7 +23,42 @@ class GameOverlay:
 
         self.is_active = True
         self.detected_targets = []
+
+        # Горячая клавиша - Insert для сворачивания/разворачивания оверлея
+        self.is_visible = True
+        self._setup_hotkey()
+
         self.render_loop()
+
+    def _setup_hotkey(self):
+        """Настраивает глобальную горячую клавишу Insert для сворачивания/разворачивания оверлея"""
+        try:
+            self._listener = keyboard.Listener(on_press=self._on_key_press)
+            self._listener.start()
+        except Exception as e:
+            print(f"Hotkey setup error: {e}")
+
+    def _on_key_press(self, key):
+        """Обработчик нажатия клавиш"""
+        try:
+            # Insert key code на pynput
+            if key == keyboard.Key.insert:
+                self.root.after(0, self._toggle_overlay)
+        except Exception as e:
+            print(f"Key press error: {e}")
+
+    def _toggle_overlay(self):
+        """Сворачивает/разворачивает оверлей"""
+        if self.is_visible:
+            # Сворачиваем - делаем окно невидимым
+            self.root.withdraw()
+            self.is_visible = False
+        else:
+            # Разворачиваем - показываем окно
+            self.root.deiconify()
+            self.root.lift()
+            self.root.focus_force()
+            self.is_visible = True
 
     def render_loop(self):
         if not self.is_active:
@@ -73,6 +110,8 @@ class GameOverlay:
     def close(self):
         self.is_active = False
         try:
+            if hasattr(self, '_listener') and self._listener:
+                self._listener.stop()
             self.root.destroy()
         except:
             pass
