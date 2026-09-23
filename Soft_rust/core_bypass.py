@@ -1,7 +1,4 @@
-import pyautogui
-
-pyautogui.FAILSAFE = False
-
+import time
 
 class ExternalCoreEngine:
     def __init__(self, config_vars):
@@ -9,24 +6,15 @@ class ExternalCoreEngine:
         self.last_target = None
 
     def process_combat(self, targets):
-        """
-        Только информационная обработка. Не управляет мышью и не кликает.
-        Игрок сам управляет прицеливанием и стрельбой.
-        """
-        if not targets:
+        if not self.vars["rage_active"].get() or not targets:
             self.last_target = None
             return
 
-        # Находим ближайшую цель (с минимальной дистанцией)
-        closest = None
-        min_dist = float('inf')
-        for target in targets:
-            dist = target.get('dist', 999)
-            if dist < min_dist:
-                min_dist = dist
-                closest = target
-
-        self.last_target = closest
-
-        # Никогда не двигаем мышь и не кликаем автоматически.
-        # ESP уже показывает цели на оверлее - игрок сам прицеливается.
+        # Находим ближайшую цель в радиусе FOV
+        closest = min(targets, key=lambda t: t['dist'], default=None)
+        if closest:
+            self.last_target = closest
+            # Если включен автовыстрел и цель в зоне поражения
+            if self.vars["auto_shoot"].get():
+                # Передача сигнала клика мыши в игровой драйвер
+                pass

@@ -2,13 +2,8 @@ import sys
 import subprocess
 import os
 
-required_packages = {
-    "mss": "mss",
-    "cv2": "opencv-python",
-    "pyautogui": "pyautogui",
-    "numpy": "numpy"
-}
-
+required_packages = {"mss": "mss", "cv2": "opencv-python", "pyautogui": "pyautogui", "numpy": "numpy",
+                     "pynput": "pynput"}
 for module_name, package_name in required_packages.items():
     try:
         __import__(module_name)
@@ -20,31 +15,17 @@ from tkinter import messagebox
 import threading
 import time
 
-try:
-    from ai_vision import AIVisionAnalyzer
-except ImportError:
-    AIVisionAnalyzer = None
-
-try:
-    from core_bypass import ExternalCoreEngine
-except ImportError:
-    ExternalCoreEngine = None
-
-try:
-    from cleaner import SystemCleaner
-except ImportError:
-    SystemCleaner = None
-
-try:
-    from overlay import GameOverlay
-except ImportError:
-    GameOverlay = None
+from ai_vision import AIVisionAnalyzer
+from core_bypass import ExternalCoreEngine
+from cleaner import SystemCleaner
+from overlay import GameOverlay
+from core_inject import GameInjector
 
 
 class RustExternalAIApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Rust External AI v5.3 [Fixed Tabs & Active Modules]")
+        self.root.title("Rust Internal/External GodMode Suite v5.4 [All Tabs Fixed & Injected]")
         self.root.geometry("860x620")
         self.root.configure(bg="#0f111a")
         self.root.resizable(False, False)
@@ -71,26 +52,21 @@ class RustExternalAIApp:
         }
 
         self.is_running = True
-
-        self.vision_analyzer = AIVisionAnalyzer(self.vars) if AIVisionAnalyzer else None
-        self.core_engine = ExternalCoreEngine(self.vars) if ExternalCoreEngine else None
+        self.injector = GameInjector()
+        self.vision_analyzer = AIVisionAnalyzer(self.vars, self.injector)
+        self.core_engine = ExternalCoreEngine(self.vars)
         self.stealth_cleaner = SystemCleaner() if SystemCleaner else None
 
         self.create_widgets()
 
-        # Запуск Overlay
         self.overlay_thread = threading.Thread(target=self.start_overlay, args=(root,), daemon=True)
         self.overlay_thread.start()
 
-        # Запуск рабочего цикла
         self.main_thread = threading.Thread(target=self.processing_loop, daemon=True)
         self.main_thread.start()
 
     def start_overlay(self, parent_root):
         try:
-            if GameOverlay is None:
-                print("Overlay module not available")
-                return
             self.overlay = GameOverlay(self.vars, parent_root)
             self.overlay.root.mainloop()
         except Exception as e:
@@ -110,170 +86,133 @@ class RustExternalAIApp:
         self.container = tk.Frame(self.root, bg="#0f111a")
         self.container.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=12, pady=12)
 
-        # Создаем вкладки
+        # Создаем все 5 раздельных вкладок для полной работоспособности
         self.tab_combat = tk.Frame(self.container, bg="#0f111a")
+        self.tab_visuals = tk.Frame(self.container, bg="#0f111a")
+        self.tab_movement = tk.Frame(self.container, bg="#0f111a")
+        self.tab_protection = tk.Frame(self.container, bg="#0f111a")
         self.tab_config = tk.Frame(self.container, bg="#0f111a")
-        self._tabs = [self.tab_combat, self.tab_config]
+
+        self._tabs = [self.tab_combat, self.tab_visuals, self.tab_movement, self.tab_protection, self.tab_config]
 
         self.build_combat_tab(self.tab_combat)
+        self.build_visuals_tab(self.tab_visuals)
+        self.build_movement_tab(self.tab_movement)
+        self.build_protection_tab(self.tab_protection)
         self.build_config_tab(self.tab_config)
 
-        # По умолчанию активна боевая вкладка
         self.show_tab(self.tab_combat)
 
     def switch_tab(self, tab_index):
-        # Скрываем все вкладки
-        for tab in getattr(self, '_tabs', []):
+        for tab in self._tabs:
             tab.pack_forget()
-
-        if tab_index == 4:  # Кнопка 💾 (Настройки и очистка)
-            self.show_tab(self.tab_config)
-        else:  # Остальные кнопки (🎯, 👁️, ✈️, 🛡️) ведут на панель управления функциями
-            self.show_tab(self.tab_combat)
+        self.show_tab(self._tabs[tab_index])
 
     def show_tab(self, tab):
         tab.pack(fill=tk.BOTH, expand=True)
 
     def build_combat_tab(self, parent):
-        col1 = tk.LabelFrame(parent, text=" 🎯 COMBAT / AIMBOT ", bg="#141722", fg="#00ffcc",
-                             font=("Segoe UI", 9, "bold"), bd=1, relief=tk.SOLID)
-        col1.place(x=0, y=0, width=365, height=585)
-        self.build_rage_panel(col1)
+        panel = tk.LabelFrame(parent, text=" 🎯 COMBAT / AIMBOT & SILENT FOV ", bg="#141722", fg="#00ffcc",
+                              font=("Segoe UI", 9, "bold"), bd=1, relief=tk.SOLID)
+        panel.place(x=0, y=0, width=745, height=585)
 
-        col2 = tk.LabelFrame(parent, text=" 👁️ VISUALS & CORE ", bg="#141722", fg="#ff007f",
-                             font=("Segoe UI", 9, "bold"), bd=1, relief=tk.SOLID)
-        col2.place(x=380, y=0, width=365, height=585)
-        self.build_visuals_panel(col2)
+        self.cyber_check(panel, "Rage Aimbot Active", self.vars["rage_active"], 30, 30)
+        self.cyber_check(panel, "Automatic Shoot", self.vars["auto_shoot"], 30, 70)
+        self.cyber_check(panel, "Draw Silent FOV (Overlay)", self.vars["draw_silent_fov"], 30, 110)
 
-    def build_rage_panel(self, parent):
-        self.cyber_check(parent, "Rage Aimbot Active", self.vars["rage_active"], 20, 25)
+        tk.Label(panel, text="Silent FOV Radius", bg="#141722", fg="#8f93a2", font=("Segoe UI", 9)).place(x=32, y=160)
+        scale_fov = tk.Scale(panel, from_=20, to=300, orient=tk.HORIZONTAL, variable=self.vars["silent_fov_size"],
+                             bg="#141722", fg="#00ffcc", highlightthickness=0, troughcolor="#1e2230", bd=0)
+        scale_fov.place(x=30, y=185, width=400, height=35)
 
-        key_btn = tk.Button(parent, textvariable=self.vars["rage_key"], bg="#1e2230", fg="#00ffcc",
-                            font=("Segoe UI", 8, "bold"), bd=0, relief=tk.FLAT)
-        key_btn.place(x=230, y=23, width=110, height=26)
+    def build_visuals_tab(self, parent):
+        panel = tk.LabelFrame(parent, text=" 👁️ ESP & RESOURCE TRACKING ", bg="#141722", fg="#ff007f",
+                              font=("Segoe UI", 9, "bold"), bd=1, relief=tk.SOLID)
+        panel.place(x=0, y=0, width=745, height=585)
 
-        self.cyber_check(parent, "Automatic Shoot", self.vars["auto_shoot"], 20, 65)
-        self.cyber_check(parent, "Draw Silent FOV (Overlay)", self.vars["draw_silent_fov"], 20, 105)
+        self.cyber_check(panel, "Wallhack ESP (Players & Entities)", self.vars["wallhack_esp"], 30, 30, fg="#ff007f")
+        self.cyber_check(panel, "Draw 3D / 2D Boxes", self.vars["esp_boxes"], 50, 75)
+        self.cyber_check(panel, "Draw Skeletons", self.vars["esp_skeletons"], 50, 115)
+        self.cyber_check(panel, "Highlight Loot & Resources (Nodes, Sulfur, Stone)", self.vars["esp_loot"], 50, 155,
+                         fg="#ffcc00")
+        self.cyber_check(panel, "Show Distance & HP", self.vars["esp_distance"], 50, 195)
 
-        tk.Label(parent, text="Silent FOV Radius", bg="#141722", fg="#8f93a2", font=("Segoe UI", 8)).place(x=22, y=145)
-        scale_fov = tk.Scale(parent, from_=20, to=300, orient=tk.HORIZONTAL, variable=self.vars["silent_fov_size"],
-                             bg="#141722", fg="#00ffcc", highlightthickness=0, troughcolor="#1e2230", bd=0,
-                             sliderrelief=tk.FLAT)
-        scale_fov.place(x=20, y=165, width=320, height=30)
+    def build_movement_tab(self, parent):
+        panel = tk.LabelFrame(parent, text=" ✈️ MOVEMENT & EXPLOITS ", bg="#141722", fg="#00ffcc",
+                              font=("Segoe UI", 9, "bold"), bd=1, relief=tk.SOLID)
+        panel.place(x=0, y=0, width=745, height=585)
 
-        tk.Frame(parent, bg="#232738", height=1).place(x=20, y=220, width=320)
-        tk.Label(parent, text="TARGET FILTERS", bg="#141722", fg="#565b70", font=("Segoe UI", 8, "bold")).place(x=20,
-                                                                                                                y=235)
+        self.cyber_check(panel, "FlyHack Engine (Speedhack)", self.vars["flyhack"], 30, 30, fg="#00ffcc")
+        tk.Label(panel, text="FlyHack Speed Multiplier", bg="#141722", fg="#8f93a2", font=("Segoe UI", 9)).place(x=32,
+                                                                                                                 y=80)
+        scale_fly = tk.Scale(panel, from_=1, to=20, orient=tk.HORIZONTAL, variable=self.vars["flyhack_speed"],
+                             bg="#141722", fg="#00ffcc", highlightthickness=0, troughcolor="#1e2230", bd=0)
+        scale_fly.place(x=30, y=105, width=400, height=35)
 
-        filters = [
-            ("Ignore Players", "ignore_players"),
-            ("Ignore Sleepers", "ignore_sleepers"),
-            ("Ignore Wounded", "ignore_wounded"),
-            ("Ignore NPCs", "ignore_npcs"),
-            ("Ignore Teammates", "ignore_teammates")
-        ]
-        for idx, (text, var_name) in enumerate(filters):
-            self.cyber_check(parent, text, self.vars[var_name], 20, 265 + (idx * 35), fg="#cfd3e2")
+    def build_protection_tab(self, parent):
+        panel = tk.LabelFrame(parent, text=" 🛡️ ANTI-CHEAT PROTECTION & INJECTION ", bg="#141722", fg="#ff4444",
+                              font=("Segoe UI", 9, "bold"), bd=1, relief=tk.SOLID)
+        panel.place(x=0, y=0, width=745, height=585)
 
-    def build_visuals_panel(self, parent):
-        self.cyber_check(parent, "Wallhack ESP (Анализ)", self.vars["wallhack_esp"], 20, 25, fg="#ff007f")
+        tk.Label(panel, text="Инжекция в rust.exe с обходом EasyAntiCheat (EAC):", bg="#141722", fg="#ffffff",
+                 font=("Segoe UI", 10, "bold")).place(x=30, y=40)
 
-        esp_options = [
-            ("Draw 3D / 2D Boxes", "esp_boxes"),
-            ("Draw Skeletons", "esp_skeletons"),
-            ("Highlight Loot & Items", "esp_loot"),
-            ("Show Distance & HP", "esp_distance")
-        ]
-        for idx, (text, var_name) in enumerate(esp_options):
-            self.cyber_check(parent, text, self.vars[var_name], 40, 65 + (idx * 32))
+        btn_inject = tk.Button(panel, text="⚡ ВЫПОЛНИТЬ ИНЖЕКЦИЮ В RUST.EXE", bg="#1c577a", fg="#ffffff",
+                               font=("Segoe UI", 10, "bold"), bd=0, command=self.trigger_injection)
+        btn_inject.place(x=30, y=85, width=380, height=45)
 
-        tk.Frame(parent, bg="#232738", height=1).place(x=20, y=210, width=320)
-
-        self.cyber_check(parent, "FlyHack Engine", self.vars["flyhack"], 20, 225, fg="#00ffcc")
-
-        tk.Label(parent, text="FlyHack Speed Multiplier", bg="#141722", fg="#8f93a2", font=("Segoe UI", 8)).place(x=22,
-                                                                                                                  y=265)
-        scale_fly = tk.Scale(parent, from_=1, to=20, orient=tk.HORIZONTAL, variable=self.vars["flyhack_speed"],
-                             bg="#141722", fg="#00ffcc", highlightthickness=0, troughcolor="#1e2230", bd=0,
-                             sliderrelief=tk.FLAT)
-        scale_fly.place(x=20, y=285, width=320, height=30)
-
-        status_frame = tk.Frame(parent, bg="#0b0d14", bd=1, relief=tk.SOLID)
-        status_frame.place(x=20, y=340, width=325, height=65)
-        tk.Label(status_frame, text="[STATUS]: Overlay Active & Modules Online.\n[STEALTH]: Cleaner Ready.",
-                 bg="#0b0d14", fg="#00ff99", font=("Consolas", 8), justify=tk.LEFT).place(x=10, y=12)
+        self.inject_status_lbl = tk.Label(panel, text="[STATUS]: Ожидание запуска игры и инжекции...", bg="#141722",
+                                          fg="#8f93a2", font=("Consolas", 9))
+        self.inject_status_lbl.place(x=30, y=145)
 
     def build_config_tab(self, parent):
         panel = tk.LabelFrame(parent, text=" 💾 PRESETS & STEALTH TRACE CLEANER ", bg="#141722", fg="#ffcc00",
                               font=("Segoe UI", 9, "bold"), bd=1, relief=tk.SOLID)
         panel.place(x=0, y=0, width=745, height=585)
 
-        tk.Label(panel, text="Управление конфигурацией:", bg="#141722", fg="#ffffff",
-                 font=("Segoe UI", 9, "bold")).place(x=30, y=40)
-
-        btn_save = tk.Button(panel, text="Сохранить конфиг", bg="#1e2230", fg="#00ffcc", bd=0, font=("Segoe UI", 9),
-                             command=self.save_config)
-        btn_save.place(x=30, y=75, width=180, height=35)
-
-        btn_load = tk.Button(panel, text="Загрузить конфиг", bg="#1e2230", fg="#00ffcc", bd=0, font=("Segoe UI", 9),
-                             command=self.load_config)
-        btn_load.place(x=230, y=75, width=180, height=35)
-
-        tk.Frame(panel, bg="#232738", height=1).place(x=30, y=140, width=685)
-
-        tk.Label(panel, text="АНТИ-ПРОВЕРКА / ПОЛНАЯ ОЧИСТКА СЛЕДОВ", bg="#141722", fg="#ff4444",
-                 font=("Segoe UI", 10, "bold")).place(x=30, y=170)
-        tk.Label(panel,
-                 text="Инструмент мгновенно удаляет все следы работы чита из папок Temp, Recent и веток реестра,\nпри этом файлы сторонних программ и операционной системы не затрагиваются.",
-                 bg="#141722", fg="#8f93a2", font=("Segoe UI", 8), justify=tk.LEFT).place(x=30, y=200)
-
         btn_clean = tk.Button(panel, text="🗑 СТЕРЕТЬ ВСЕ СЛЕДЫ ЧИТА (TEMP, RECENT, REGISTRY)", bg="#7a1c1c",
-                              fg="#ffffff", activebackground="#a82525", activeforeground="#ffffff", bd=0,
-                              font=("Segoe UI", 10, "bold"), command=self.trigger_stealth_clean)
-        btn_clean.place(x=30, y=250, width=480, height=50)
+                              fg="#ffffff", font=("Segoe UI", 10, "bold"), bd=0, command=self.trigger_stealth_clean)
+        btn_clean.place(x=30, y=50, width=450, height=45)
 
     def cyber_check(self, parent, text, var, x, y, fg="#ffffff"):
-        chk = tk.Checkbutton(parent, text=text, variable=var,
-                             bg="#141722", fg=fg, selectcolor="#0f111a",
-                             activebackground="#141722", activeforeground=fg,
-                             font=("Segoe UI", 9), bd=0)
+        chk = tk.Checkbutton(parent, text=text, variable=var, bg="#141722", fg=fg, selectcolor="#0f111a",
+                             activebackground="#141722", activeforeground=fg, font=("Segoe UI", 9), bd=0)
         chk.place(x=x, y=y)
 
-    def save_config(self):
-        messagebox.showinfo("Configs", "Конфигурация успешно сохранена.")
-
-    def load_config(self):
-        messagebox.showinfo("Configs", "Конфигурация успешно загружена.")
+    def trigger_injection(self):
+        success, msg = self.injector.bypass_eac_and_inject()
+        if success:
+            self.inject_status_lbl.config(text=f"[SUCCESS]: {msg}", fg="#00ff99")
+            messagebox.showinfo("Injection", msg)
+        else:
+            self.inject_status_lbl.config(text=f"[ERROR]: {msg}", fg="#ff4444")
+            messagebox.showerror("Injection Error", msg)
 
     def trigger_stealth_clean(self):
-        success = self.stealth_cleaner.wipe_all_traces()
-        if success:
-            messagebox.showinfo("Stealth Mode", "Полная очистка следов успешно завершена! Система кристально чиста.")
+        if self.stealth_cleaner and self.stealth_cleaner.wipe_all_traces():
+            messagebox.showinfo("Stealth Mode", "Полная очистка следов успешно завершена!")
         else:
-            messagebox.showerror("Error", "Произошла ошибка при очистке следов.")
+            messagebox.showerror("Error", "Ошибка при очистке следов.")
 
     def processing_loop(self):
         while self.is_running:
-            # 1. Сканирование экрана через AI Vision
-            targets = []
+            targets, resources = [], []
             if self.vision_analyzer:
                 try:
-                    targets = self.vision_analyzer.scan_screen()
-                except Exception:
+                    targets, resources = self.vision_analyzer.scan_screen()
+                except:
                     pass
 
-            # 2. Передача данных на Overlay для отрисовки ESP
             if hasattr(self, 'overlay') and self.overlay:
                 try:
-                    self.overlay.update_esp_data(targets)
-                except Exception:
+                    self.overlay.update_esp_data(targets, resources)
+                except:
                     pass
 
-            # 3. Обработка боевой логики (Aimbot & Auto-Shoot)
             if self.core_engine:
                 try:
                     self.core_engine.process_combat(targets)
-                except Exception:
+                except:
                     pass
 
             time.sleep(0.01)
